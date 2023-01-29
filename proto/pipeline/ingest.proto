@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+package injest;
+
+message CertificateLog {
+    string subject = 1;
+
+    int64 index = 2;
+    string log_url = 3;
+}

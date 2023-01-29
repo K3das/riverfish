@@ -1,0 +1,11 @@
+version: v1
+managed:
+  enabled: true
+  go_package_prefix:
+    default: github.com/K3das/riverfish/proto/go
+plugins:
+  - name: go
+    out: go
+    opt: paths=source_relative
+  - name: python
+    out: py

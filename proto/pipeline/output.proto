@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package output;
+
+message ScoredCertificateLog {
+    string subject = 1;
+
+    string log_url = 2;
+    int64 index = 3;
+
+    float total_score = 4;
+    float alg_score = 5;
+    float ml_score = 6;
+}

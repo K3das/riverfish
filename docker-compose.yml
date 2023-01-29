@@ -1,0 +1,87 @@
+version: "3.8"
+
+services:
+  panda:
+    image: docker.redpanda.com/vectorized/redpanda:v22.2.7
+    command:
+      - redpanda start
+      - --smp 1
+      - --overprovisioned
+      - --node-id 0
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:29092,OUTSIDE://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://panda:29092,OUTSIDE://localhost:9092
+    healthcheck: 
+      test: ["CMD", "curl", "-f", "localhost:9644/v1/status/ready"]
+      interval: 5s
+      timeout: 1s
+      retries: 5
+      start_period: 5s
+  pandaconsole:
+    image: docker.redpanda.com/vectorized/console:latest
+    entrypoint: /bin/sh
+    command: -c "echo \"$$CONSOLE_CONFIG_FILE\" > /tmp/config.yml; /app/console"
+    environment:
+      CONFIG_FILEPATH: /tmp/config.yml
+      CONSOLE_CONFIG_FILE: |
+        kafka:
+          brokers: ["panda:29092"]
+          schemaRegistry:
+            enabled: true
+            urls: ["http://panda:8081"]
+        redpanda:
+          adminApi:
+            enabled: true
+            urls: ["http://panda:9644"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      panda:
+        condition: service_healthy
+      scoring:
+        condition: service_started
+
+  ct-collection:
+    build:
+      dockerfile: ct-collection/Dockerfile
+      context: .
+    environment:
+      - PANDA=panda:29092
+      - INGEST_TOPIC=ingest
+    depends_on:
+      panda:
+        condition: service_healthy
+  
+  scoring:
+    build: scoring/
+    environment:
+      - PANDA=panda:29092
+      - INGEST_TOPIC=ingest
+      - OUTPUT_TOPIC=output
+    depends_on:
+      panda:
+        condition: service_healthy
+  
+  output:
+    build: 
+      dockerfile: output/Dockerfile
+      context: .
+    # security_opt:
+    #   - seccomp=chrome.json
+    environment:
+      - PANDA=panda:29092
+      - OUTPUT_TOPIC=output
+    depends_on:
+      panda:
+        condition: service_healthy
+      tor:
+        condition: service_healthy
+  tor:
+    image: peterdavehello/tor-socks-proxy
+    healthcheck: 
+      test: ["CMD", "curl", "-f", "--socks5-hostname", "127.0.0.1:9150", "https://icanhazip.com"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
